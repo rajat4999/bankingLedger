@@ -95,7 +95,7 @@ async function createTransaction(req,res){
     const session=await mongoose.startSession()
     session.startTransaction()
 
-    transaction = (awaittransactionModel.create([{
+    transaction = (await transactionModel.create([{
       fromAccount,
       toAccount,
       amount,
@@ -132,7 +132,27 @@ async function createTransaction(req,res){
 
     await session.commitTransaction()
     session.endSession()
+
+
+    return res.status(200).json({
+    message: "Transfer successful!",
+    transaction: transaction
+  });
+
+
   }catch(error){
+    await transactionModel.findOneAndUpdate(
+      { idempotencyKey }, 
+      { 
+        fromAccount, 
+        toAccount, 
+        amount, 
+        status: "FAILED" 
+      }, 
+      { upsert: true } 
+    );
+
+
     return res.status(400).json({
       message:"Transaction is pending due to some error, plese retry after some time",
     })
@@ -158,7 +178,7 @@ async function createInitialFundTransaction(req,res){
     })
   }
   const fromUserAccount=await accountModel.findOne({
-    systemUser:true,
+    // systemUser:true,
     user:req.user._id
   })
 
@@ -194,8 +214,8 @@ async function createInitialFundTransaction(req,res){
 
 
 
-  transaction.status=="COMPLETED"
-  await transaction.save({sesssion})
+  transaction.status="COMPLETED"
+  await transaction.save({session})
   await session.commitTransaction()
   session.endSession()
 
